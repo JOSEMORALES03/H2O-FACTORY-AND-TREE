@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>H₂O Factory — Panel de Monitoreo (Demo)</title>
+  <style>
+    :root{
+      --bg:#0f1113; --surface:#161a17; --card:#1b1f1d; --muted:#9aa6b2; --text:#e8f3ec;
+      --accent:#00c853; --accent-2:#00bfff; --ok:#19c37d; --warn:#ffd166; --danger:#ff5d5d;
+    }
+    [data-theme="light"]{
+      --bg:#f5f7f6; --surface:#ffffff; --card:#ffffff; --muted:#5a6b66; --text:#102018;
+      --accent:#17a34a; --accent-2:#0ea5e9; --ok:#16a34a; --warn:#ca8a04; --danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:radial-gradient(1200px 600px at 10% -10%, rgba(0,200,83,.10), transparent 60%),
+                 linear-gradient(180deg, #0c140f 0%, var(--bg) 100%);
+      color:var(--text); display:flex; flex-direction:column; align-items:center; padding:20px}
+    header{width:100%; max-width:1100px; display:flex; gap:14px; align-items:center; margin-bottom:14px}
+    .brand{display:flex; gap:10px; align-items:center}
+    .logo{width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:linear-gradient(145deg, var(--accent), var(--accent-2)); color:#03150d; font-weight:900}
+    h1{font-size:20px; margin:0}
+    .sub{font-size:12px; color:var(--muted); margin-top:2px}
+
+    .controls{margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; align-items:end}
+    .ctrl{display:flex; flex-direction:column; gap:6px; font-size:12px}
+    input[type="text"], input[type="number"], select{
+      background:color-mix(in oklab, var(--card), #000 10%);
+      border:1px solid color-mix(in oklab, var(--muted), transparent 75%);
+      color:var(--text); padding:8px 10px; border-radius:10px; outline:none; min-width:90px
+    }
+    button{background:var(--accent); color:#03150d; border:none; padding:9px 12px; border-radius:10px; cursor:pointer; font-weight:700}
+    .ghost{background:transparent; border:1px solid color-mix(in oklab, var(--muted), transparent 70%); color:var(--text)}
+
+    main{width:100%; max-width:1100px}
+
+    .summary{display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:12px; margin:12px 0 18px}
+    .kpi{background:var(--card); border:1px solid color-mix(in oklab, var(--accent), transparent 80%); padding:12px; border-radius:12px}
+    .kpi .label{font-size:12px; color:var(--muted)}
+    .kpi .value{font-size:22px; font-weight:800; margin-top:4px}
+    .kpi .order{margin-top:6px; font-size:12px; color:#03150d; background:var(--accent); display:inline-block; padding:4px 8px; border-radius:999px; font-weight:800}
+    .kpi .order.warn{ background:var(--warn); color:#2a2100 }
+    .kpi .order.ok{ background:var(--ok); color:#062012 }
+
+    #sensor-grid{display:grid; gap:12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))}
+    .sensor-card{background:var(--card); border:1px solid rgba(0,0,0,.2); padding:12px; border-radius:12px;
+      display:flex; flex-direction:column; gap:8px; transition:transform .12s, border-color .2s, background .2s;
+      background-image: linear-gradient(90deg, transparent, color-mix(in oklab, var(--card), #fff 2%), transparent);
+      background-size:200% 100%; animation: shimmer 6s linear infinite;}
+    .sensor-card:hover{transform:translateY(-3px)}
+    .row{display:flex; justify-content:space-between; align-items:center; gap:6px}
+    .id{color:var(--accent); font-weight:800; font-feature-settings:"tnum" 1; letter-spacing:.3px}
+    .badge{font-size:11px; padding:3px 7px; border-radius:999px; border:1px solid color-mix(in oklab, var(--muted), transparent 65%); color:var(--muted)}
+    .value{font-size:26px; font-weight:900; letter-spacing:.2px; transition: transform .18s ease, text-shadow .18s ease}
+    .value.bump{ transform: translateY(-2px) }
+    .unit{font-size:12px; color:var(--muted); margin-left:6px}
+    .meta{font-size:12px; color:var(--muted)}
+
+    .ok{border-color: color-mix(in oklab, var(--ok), transparent 70%)}
+    .warn{border-color: color-mix(in oklab, var(--warn), transparent 70%)}
+    .danger-card{border-color: color-mix(in oklab, var(--danger), transparent 50%); box-shadow:0 0 0 2px color-mix(in oklab, var(--danger), transparent 85%) inset}
+
+    footer{margin:16px 0; color:var(--muted); font-size:12px}
+    /* shimmer */
+    @keyframes shimmer{0%{background-position: -200% 0}100%{background-position:200% 0}}
+
+    /* Consejos */
+    .tips{margin-top:18px; display:grid; gap:10px}
+    .tips .tip{background:var(--card); border:1px dashed color-mix(in oklab, var(--accent), transparent 80%); padding:10px 12px; border-radius:12px; font-size:14px}
+    .tips .sym{font-weight:800}
+  
+
+    /* ====== Responsive ====== */
+    @media (max-width:1024px){
+      header, main{max-width:100%}
+    }
+    @media (max-width:900px){
+      header{flex-direction:column; align-items:stretch}
+      .controls{margin-left:0; width:100%; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px}
+      .ctrl{min-width:0}
+      .ctrl input, .controls button, .controls select{width:100%}
+      .summary{grid-template-columns:repeat(2, minmax(0,1fr))}
+      #sensor-grid{grid-template-columns:repeat(auto-fill, minmax(160px, 1fr))}
+    }
+    @media (max-width:600px){
+      body{padding:12px}
+      h1{font-size:18px}
+      .logo{width:30px; height:30px}
+      .summary{grid-template-columns:1fr}
+      #sensor-grid{grid-template-columns:1fr}
+      .controls{grid-template-columns:1fr}
+      .kpi .value{font-size:20px}
+      .value{font-size:22px}
+      footer{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">💧</div>
+      <div>
+        <h1>H₂O Factory — Panel de Monitoreo</h1>
+        <div class="sub">Demo con datos aleatorios (listo para hardware)</div>
+      </div>
+    </div>
+
+    <div class="controls" role="group" aria-label="Controles">
+      <label class="ctrl">Sensores
+        <input id="count" type="number" min="1" max="500" value="16" />
+      </label>
+      <label class="ctrl">Intervalo (ms)
+        <input id="interval" type="number" min="200" step="100" value="2500" />
+      </label>
+      <label class="ctrl">Umbral suelo seco (%)
+        <input id="umbral" type="number" min="0" max="100" value="30" />
+      </label>
+      <label class="ctrl">Buscar ID
+        <input id="search" type="text" placeholder="p. ej., S005" />
+      </label>
+      <button id="apply">Aplicar</button>
+      <button id="toggle" class="ghost">Detener</button>
+      <button id="export" class="ghost">Exportar CSV</button>
+      <button id="theme" class="ghost" title="Cambiar tema">🌙/☀️</button>
+      <button id="demoRiego" class="ghost" title="Forzar escenario de riego">Forzar Riego</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- KPIs -->
+    <section class="summary" aria-live="polite">
+      <div class="kpi">
+        <div class="label">Promedio Humedad</div>
+        <div class="value"><span id="avgH">--</span><span class="unit">%</span></div>
+        <div id="riegoMsg" class="order" style="display:none">Regando plantas, espere por favor…</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Estado del equipo</div>
+        <div class="value"><span id="equipoEstadoVal">—</span></div>
+        <div id="equipoEstadoBadge" class="order warn">Equipo en espera</div>
+        <div class="meta" id="historialEquipo">Último apagado: —</div>
+      </div>
+      <div class="kpi"><div class="label">Promedio Temperatura</div><div class="value"><span id="avgT">--</span><span class="unit">°C</span></div></div>
+      <div class="kpi"><div class="label">Sensores con suelo seco</div><div class="value"><span id="lowCount">--</span></div></div>
+      <div class="kpi"><div class="label">Estado</div><div class="value"><span id="estadoLbl">ejecutando</span></div></div>
+    </section>
+
+    <div id="sensor-grid" aria-live="polite"></div>
+
+    <!-- Consejos del día -->
+    <section class="tips" id="tips">
+      <div class="tip"><span class="sym">Hojas amarillas:</span> posible falta de <b>Nitrógeno (N)</b>. Fuente natural: <i>compost maduro</i>, <i>té de compost</i>, <i>estiércol bien curtido</i>.</div>
+      <div class="tip"><span class="sym">Bordes marrones/secos:</span> posible falta de <b>Potasio (K)</b>. Fuente natural: <i>ceniza de madera</i> (usar muy poca, bien distribuida y sin contacto directo con raíces).</div>
+      <div class="tip"><span class="sym">Hojas con tonos morados:</span> posible falta de <b>Fósforo (P)</b>. Fuente natural: <i>harina de hueso</i>, <i>fosfato natural blando</i>.</div>
+      <div class="tip"><span class="sym">Clorosis intervenal (verde en venas, claro entre venas):</span> posible falta de <b>Magnesio (Mg)</b>. Fuente natural: <i>sales de Epsom</i> (disueltas y aplicadas foliar o al suelo).</div>
+      <div class="tip"><span class="sym">Brote nuevo débil/deformado:</span> posible falta de <b>Calcio (Ca)</b>. Fuente natural: <i>cáscaras de huevo compostadas</i>, <i>harina de roca</i>.</div>
+      <div class="tip"><span class="sym">Crecimiento lento y palidez general:</span> posible falta de <b>Hierro (Fe)</b>. Fuente natural: <i>té de ortiga</i>, materia orgánica activa; mejorar <i>pH</i> y drenaje.</div>
+      <div class="meta">Consejo: verifica pH y riego antes de aportar nutrientes; ajustes excesivos pueden dañar la planta.</div>
+    </section>
+  </main>
+
+  <footer>
+    <div id="status">Actualiza cada <span id="status-interval">2500</span> ms • Fuente: <strong id="fuente">Aleatoria</strong> • <span id="ts"></span></div>
+  </footer>
+
+  <script>
+  'use strict';
+  // ===== Estado principal =====
+  let sensores = []; let timer = null; let running = true; let fuenteDatos = 'random';
+  let rafId = null; const valEls = new Map();
+
+  // DEMO RIEGO
+  let demoBias = -0.25;            // tendencia a secarse (escenario)
+  let irrigationActive = false;    // riego en curso
+  let irrigationJustFinishedTS = 0; // mostrar mensaje de completado
+
+  // HISTORIAL
+  let lastStopTS = null;           // último "equipo detenido"
+  let lastIrrigationStartTS = null;
+  let lastIrrigationEndTS = null;
+
+  // ===== Elementos DOM =====
+  const grid = document.getElementById('sensor-grid');
+  const searchInput = document.getElementById('search');
+  const countInput = document.getElementById('count');
+  const intervalInput = document.getElementById('interval');
+  const umbralInput = document.getElementById('umbral');
+  const applyBtn = document.getElementById('apply');
+  const toggleBtn = document.getElementById('toggle');
+  const exportBtn = document.getElementById('export');
+  const themeBtn = document.getElementById('theme');
+  const demoRiegoBtn = document.getElementById('demoRiego');
+
+  const avgH = document.getElementById('avgH');
+  const avgT = document.getElementById('avgT');
+  const lowCount = document.getElementById('lowCount');
+  const statusInterval = document.getElementById('status-interval');
+  const estadoLbl = document.getElementById('estadoLbl');
+  const fuenteLbl = document.getElementById('fuente');
+  const tsLbl = document.getElementById('ts');
+  const riegoMsg = document.getElementById('riegoMsg');
+  const equipoEstadoVal = document.getElementById('equipoEstadoVal');
+  const equipoEstadoBadge = document.getElementById('equipoEstadoBadge');
+  const historialEquipo = document.getElementById('historialEquipo');
+
+  // ===== Sensores =====
+  function crearSensores(n){
+    sensores = [];
+    for(let i=1;i<=n;i++){
+      const tipo = (i % 4 === 0) ? 'Temperatura' : 'Humedad'; // 25% temperatura
+      const v0 = generarValorInicial(tipo);
+      sensores.push({ id: 'S'+String(i).padStart(3,'0'), tipo, valor: v0, display: v0, estado: 'OK', historial: [] });
+    }
+  }
+  function generarValorInicial(tipo){
+    if(tipo==='Temperatura') return +(20 + Math.random()*7).toFixed(2); // 20-27°C
+    return +(50 + Math.random()*18).toFixed(2); // 50-68% suelo (arranca cómodo)
+  }
+
+  function variacionDiaria(tipo){
+    const h = new Date().getHours();
+    const ciclo = Math.sin((h/24) * Math.PI * 2); // -1..1
+    if(tipo==='Temperatura') return ciclo * 1.0; // ±1°C
+    return ciclo * -2.5; // humedad: baja leve tarde, sube noche
+  }
+
+  function actualizarValoresRandom(){
+    const umbral = Number(umbralInput.value)||30;
+    const now = Date.now();
+    sensores.forEach(s=>{
+      const raw = Number(s.valor);
+      const drift = (Math.random()*2 - 1) * (s.tipo==='Temperatura' ? 0.15 : 0.5);
+      let nuevo = raw + drift + variacionDiaria(s.tipo);
+
+      if(s.tipo==='Humedad'){
+        // tendencia demo
+        nuevo += demoBias;
+        // efecto de riego: subir hacia 60-70%
+        if(irrigationActive){
+          const target = 65 + (Math.random()*6 - 3); // 62-68%
+          nuevo += (target - raw) * 0.25;
+        }
+      }
+
+      // límites
+      if(s.tipo==='Temperatura') nuevo = Math.max(14, Math.min(33, nuevo));
+      else nuevo = Math.max(0, Math.min(100, nuevo));
+      s.valor = +nuevo.toFixed(2);
+
+      // histórico compacto
+      s.historial.push({t:now, v:s.valor});
+      if(s.historial.length>64) s.historial.shift();
+
+      // estado
+      const prevEstado = s.estado;
+      if(s.tipo==='Humedad'){
+        if(s.valor < umbral) s.estado = '⚠️ Suelo seco';
+        else if(s.valor > 85) s.estado = 'Encharcado';
+        else s.estado = 'OK';
+      }else s.estado = 'OK';
+      s._estadoCambio = prevEstado !== s.estado;
+    });
+
+    gestionarRiego();
+
+    render(searchInput.value);
+    actualizarKPIs();
+    tsLbl.textContent = new Date().toLocaleTimeString();
+  }
+
+  function gestionarRiego(){
+    const hum = sensores.filter(s=>s.tipo==='Humedad').map(s=>s.valor);
+    const prom = hum.length ? hum.reduce((a,b)=>a+b,0)/hum.length : 0;
+    const umbral = Number(umbralInput.value)||30;
+
+    if(!irrigationActive && prom < umbral){
+      // Dispara riego
+      irrigationActive = true;
+      lastIrrigationStartTS = Date.now();
+      riegoMsg.style.display = 'inline-block';
+      riegoMsg.className = 'order';
+      demoBias = +0.2; // invierte tendencia
+      setEquipoEstado('Se enciende riego debido a suelo seco', 'warn');
+    }
+
+    if(irrigationActive && prom >= 62){
+      // Termina riego
+      irrigationActive = false;
+      irrigationJustFinishedTS = Date.now();
+      lastIrrigationEndTS = irrigationJustFinishedTS;
+      riegoMsg.textContent = 'Riego completado';
+      riegoMsg.className = 'order ok';
+      demoBias = -0.15; // vuelve a secarse lentamente
+      setEquipoEstado('Riego completado — estabilizando…', 'ok');
+      actualizarHistorialUI();
+    }
+
+    // Oculta mensaje de completado tras 8s
+    if(!irrigationActive && riegoMsg.style.display !== 'none'){
+      if(Date.now() - irrigationJustFinishedTS > 8000){
+        riegoMsg.style.display = 'none';
+        riegoMsg.textContent = 'Regando plantas, espere por favor…';
+        riegoMsg.className = 'order';
+      }
+    }
+  }
+
+  // ===== Render y KPIs =====
+  function clasePorEstado(s){
+    if(s.tipo!=='Humedad') return 'ok';
+    const um = Number(umbralInput.value)||30;
+    if(s.valor < um) return 'danger-card';
+    if(s.valor > 85) return 'warn';
+    return 'ok';
+  }
+
+  function render(filter=''){
+    const q = filter.trim().toLowerCase();
+    grid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    valEls.clear();
+
+    sensores
+      .filter(s => s.id.toLowerCase().includes(q))
+      .forEach(s => {
+        const card = document.createElement('div');
+        card.className = `sensor-card ${clasePorEstado(s)}`;
+        const unidad = s.tipo==='Temperatura' ? '°C' : '%';
+        const icon = s.tipo==='Temperatura' ? '🌡️' : '💧';
+        const valId = `val-${s.id}`;
+        card.innerHTML = `
+          <div class="row">
+            <div class="id">${s.id}</div>
+            <span class="badge">${icon} ${s.tipo}</span>
+          </div>
+          <div class="row" aria-live="polite">
+            <div class="value" id="${valId}" data-unidad="${unidad}">${(s.display ?? s.valor).toFixed(2)}<span class="unit">${unidad}</span></div>
+          </div>
+          <div class="meta">${s.estado}</div>`;
+        frag.appendChild(card);
+        valEls.set(s.id, () => document.getElementById(valId));
+      });
+
+    grid.appendChild(frag);
+
+    if(grid.children.length===0){
+      grid.innerHTML = '<div class="meta" style="padding:12px">No hay sensores que coincidan.</div>';
+    }
+  }
+
+  function actualizarKPIs(){
+    const hum = sensores.filter(s=>s.tipo==='Humedad').map(s=>s.valor);
+    const temp = sensores.filter(s=>s.tipo==='Temperatura').map(s=>s.valor);
+    const prom = a=> a.length? (a.reduce((x,y)=>x+y,0)/a.length) : NaN;
+    const h = prom(hum), t = prom(temp);
+    avgH.textContent = isNaN(h)? '--' : h.toFixed(1);
+    avgT.textContent = isNaN(t)? '--' : t.toFixed(1);
+    const um = Number(umbralInput.value)||30;
+    lowCount.textContent = hum.filter(v=>v<um).length;
+    actualizarEstadoEquipo(h, um);
+  }
+
+  function setEquipoEstado(text, style='warn'){
+    equipoEstadoVal.textContent = text;
+    equipoEstadoBadge.textContent = text;
+    equipoEstadoBadge.className = 'order ' + (style==='ok' ? 'ok' : (style==='warn'?'warn':''));
+  }
+  function actualizarEstadoEquipo(h, umbral){
+    const now = Date.now();
+    if(!running){
+      setEquipoEstado('Equipo detenido (manual)', 'warn');
+      return;
+    }
+    if(irrigationActive){
+      setEquipoEstado('Se enciende riego debido a suelo seco', 'warn');
+      return;
+    }
+    if(now - irrigationJustFinishedTS < 8000){
+      setEquipoEstado('Riego completado — estabilizando…', 'ok');
+      return;
+    }
+    if(!isNaN(h)){
+      if(h < umbral){
+        setEquipoEstado('Detectado suelo seco — iniciando riego', 'warn');
+      }else{
+        setEquipoEstado('En espera — condiciones OK', 'ok');
+      }
+    } else {
+      setEquipoEstado('En espera', 'warn');
+    }
+  }
+
+  function actualizarHistorialUI(){
+    const fmt = ts => new Date(ts).toLocaleString();
+    let parts = [];
+    if(lastStopTS) parts.push(`Último apagado: ${fmt(lastStopTS)}`);
+    if(lastIrrigationStartTS) parts.push(`Último inicio de riego: ${fmt(lastIrrigationStartTS)}`);
+    if(lastIrrigationEndTS) parts.push(`Último fin de riego: ${fmt(lastIrrigationEndTS)}`);
+    historialEquipo.textContent = parts.length? parts.join(' • ') : 'Último apagado: —';
+  }
+
+  // ===== Animación de valores =====
+  function tick(){
+    sensores.forEach(s=>{
+      if(s.display == null) s.display = s.valor;
+      const alpha = 0.06; // más lento para sensación de control
+      s.display = s.display + (s.valor - s.display) * alpha;
+      const getEl = valEls.get(s.id);
+      if(getEl){
+        const el = getEl(); if(el){
+          el.firstChild && (el.firstChild.nodeValue = s.display.toFixed(2));
+          el.classList.add('bump'); setTimeout(()=> el.classList.remove('bump'), 120);
+        }
+      }
+    });
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // ===== Timer principal =====
+  function startTimer(){
+    stopTimer();
+    const ms = Number(intervalInput.value)||2500;
+    statusInterval.textContent = ms;
+    timer = setInterval(actualizarValoresRandom, ms);
+    if(!rafId) rafId = requestAnimationFrame(tick);
+    running = true; toggleBtn.textContent='Detener'; estadoLbl.textContent='ejecutando';
+    actualizarHistorialUI();
+  }
+  function stopTimer(){
+    if(timer) clearInterval(timer); timer=null;
+    if(rafId) cancelAnimationFrame(rafId); rafId=null;
+    running=false; toggleBtn.textContent='Iniciar'; estadoLbl.textContent='detenido';
+    lastStopTS = Date.now();
+    setEquipoEstado('Equipo detenido (manual)', 'warn');
+    actualizarHistorialUI();
+  }
+
+  // ===== Exportar CSV =====
+  function exportarCSV(){
+    const rows = ['ID,Tipo,Valor,Estado'];
+    sensores.forEach(s=> rows.push(`${s.id},${s.tipo},${s.valor},${s.estado}`));
+    const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `lecturas_${Date.now()}.csv`; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ===== Eventos UI =====
+  let theme = localStorage.getItem('h2o_theme') || 'dark';
+  if(theme==='light') document.documentElement.setAttribute('data-theme','light');
+  themeBtn.addEventListener('click', ()=>{
+    theme = theme==='dark' ? 'light' : 'dark';
+    localStorage.setItem('h2o_theme', theme);
+    if(theme==='light') document.documentElement.setAttribute('data-theme','light');
+    else document.documentElement.removeAttribute('data-theme');
+  });
+
+  applyBtn.addEventListener('click', ()=>{
+    crearSensores(Math.max(1, Math.min(500, Number(countInput.value)||16)));
+    render(searchInput.value); actualizarKPIs(); startTimer();
+  });
+  toggleBtn.addEventListener('click', ()=> running ? stopTimer() : startTimer());
+  exportBtn.addEventListener('click', exportarCSV);
+  searchInput.addEventListener('input', e=> render(e.target.value));
+  umbralInput.addEventListener('change', ()=>{ render(searchInput.value); actualizarKPIs(); });
+  intervalInput.addEventListener('change', ()=>{ if(running) startTimer(); else statusInterval.textContent = Number(intervalInput.value)||2500; });
+  demoRiegoBtn.addEventListener('click', ()=>{
+    demoBias = -0.35; irrigationActive=false; riegoMsg.style.display='none';
+    actualizarHistorialUI();
+  });
+
+  // ===== Inicialización =====
+  crearSensores(Number(countInput.value) || 16);
+  render(); actualizarKPIs(); startTimer();
+  fuenteLbl.textContent = 'Aleatoria'; tsLbl.textContent = new Date().toLocaleTimeString();
+  actualizarHistorialUI();
+  </script>
+</body>
+</html>
